@@ -1,6 +1,30 @@
 name   = "inference-endpoint"
-bucket = "gs://REPLACE_WITH_YOUR_BUCKET"  # substituted by slipstream at runtime
+# Slipstream substitutes ${BUCKET} from slipstream.toml at runtime. For direct
+# `shark pipeline run` invocations, export BUCKET in your shell.
+bucket = "${BUCKET}"
 
 [[stage]]
 name = "serve"
 dir  = "jobs/inference-endpoint"
+
+# [stage.env] flows into the SkyPilot envs: block on the VM, reaching run.sh.
+# When run via slipstream, schema [[input]] values arrive via global_env which
+# wins over [stage.env] (see pipeline.py priority chain). When run directly via
+# `shark pipeline run`, the ${VAR} substitution lets users pass values through
+# the shell. Defaults match schema.toml; required inputs (TARGET_MODEL,
+# ACCELERATORS) intentionally have no default so a missing export fails fast.
+[stage.env]
+TARGET_MODEL      = "${TARGET_MODEL}"
+ACCELERATORS      = "${ACCELERATORS}"
+ENGINE            = "${ENGINE:-sglang}"
+PORT              = "${PORT:-8000}"
+MEM_FRACTION      = "${MEM_FRACTION:-0.85}"
+HF_TOKEN          = "${HF_TOKEN:-}"
+SERVED_MODEL_NAME = "${SERVED_MODEL_NAME:-}"
+DTYPE             = "${DTYPE:-}"
+QUANTIZATION      = "${QUANTIZATION:-}"
+MAX_MODEL_LEN     = "${MAX_MODEL_LEN:-}"
+SPEC_ENABLED      = "${SPEC_ENABLED:-false}"
+SPEC_DRAFT_MODEL  = "${SPEC_DRAFT_MODEL:-}"
+SPEC_METHOD       = "${SPEC_METHOD:-eagle3}"
+SPEC_NUM_TOKENS   = "${SPEC_NUM_TOKENS:-3}"
