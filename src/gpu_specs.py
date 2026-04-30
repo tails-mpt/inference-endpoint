@@ -27,6 +27,20 @@ VRAM_GB: dict[str, float] = {
     "B300": 288.0,
 }
 
+# GPUs with hardware FP8 (E4M3 / fp8e4nv) support. Pre-Hopper architectures
+# (Ampere: A100/A10, Turing: T4, Ada: L4) lack the tensor-core path that
+# sglang's --quantization fp8 and vllm's --quantization fp8 rely on, so the
+# Triton kernel fails to compile at weight-load time with:
+#   ValueError("type fp8e4nv not supported in this architecture")
+# Use bf16 + bigger VRAM (e.g. A100-80GB:2 instead of A100:4 + fp8) on these.
+FP8_SUPPORTED: set[str] = {
+    "H100",
+    "H100-MEGA-80GB",
+    "H200",
+    "B200",
+    "B300",
+}
+
 
 @dataclass
 class GPUInventory:

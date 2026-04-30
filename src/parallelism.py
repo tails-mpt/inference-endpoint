@@ -25,7 +25,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from gpu_specs import GPUInventory, parse_accelerators
+from gpu_specs import FP8_SUPPORTED, GPUInventory, parse_accelerators
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +273,15 @@ def compute_or_die() -> dict[str, Any]:
     print(f"Resolving GPU spec: {accelerators}")
     gpu = parse_accelerators(accelerators)
     print(f"  → {gpu.count}x {gpu.name} ({gpu.vram_gb:.0f} GB each, {gpu.vram_gb * gpu.count:.0f} GB total)")
+
+    if quantization and quantization.lower() == "fp8" and gpu.name not in FP8_SUPPORTED:
+        sys.exit(
+            f"Error: fp8 quantization requires Hopper+ ({sorted(FP8_SUPPORTED)}); "
+            f"got {gpu.name}. The Triton kernel sglang/vllm use compiles to "
+            f"fp8e4nv which has no hardware path on Ampere/Ada/Turing. "
+            f"Options: drop QUANTIZATION and use bf16 with a larger GPU spec "
+            f"(e.g. A100-80GB:2 fits Llama-70B in bf16), or QUANTIZATION=int8wo."
+        )
 
     print(f"Inspecting model: {target_model}")
     meta = validate_model_accessible(target_model)
