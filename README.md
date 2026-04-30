@@ -30,6 +30,89 @@ TP/DP/EP are computed automatically from model size + GPU spec.
 | `SPEC_METHOD` | `eagle3` | sglang: `EAGLE`/`EAGLE3`/`STANDALONE`. vllm: `eagle`/`eagle3`. |
 | `SPEC_NUM_TOKENS` | `3` | Tokens drafted per step. |
 
+## Running
+
+This tool runs through slipstream in production. To test it directly via
+baby-shark on GCP, follow these steps.
+
+### Prerequisites
+
+```bash
+# GCS bucket (existing or new) — used by baby-shark for pipeline state
+gcloud storage buckets create gs://YOUR-BUCKET --location=us-west1
+
+# ADC auth for SkyPilot
+gcloud auth application-default login
+
+# baby-shark with ${VAR} interpolation (PR tails-mpt/baby-shark#110)
+git clone https://github.com/tails-mpt/baby-shark.git
+cd baby-shark
+git checkout feat/shark-toml-env-interpolation   # remove once PR lands
+uv sync
+
+# Sanity check
+uv run shark sky check
+```
+
+### Launch
+
+```bash
+cd inference-endpoint
+
+# Required
+export BUCKET="gs://YOUR-BUCKET"
+export TARGET_MODEL="Qwen/Qwen2.5-1.5B-Instruct"
+export ACCELERATORS="L4:1"
+
+# Optional — defaults match schema.toml
+export ENGINE="sglang"
+export HF_TOKEN="hf_..."   # only for gated models
+
+uv run --project /path/to/baby-shark \
+  shark pipeline run --pipeline-file .slipstream/pipeline/shark_pipeline.toml
+```
+
+The pipeline's `[stage.env]` block uses `${VAR}` interpolation to pull these
+exports into the VM's environment, so the same shark.toml works under
+slipstream (which uses `global_env`) and via direct `shark pipeline run`.
+
+### What success looks like
+
+1. SkyPilot provisions an L4 spot VM in GCP (~3 min).
+2. `run.sh` on the VM logs:
+   - `=== Computing parallelism ===` → `TP=1, DP=1, EP=1`
+   - `=== Installing engine: sglang ===` (~2 min)
+   - `=== Launching server ===`
+   - `Endpoint live at http://<external-ip>:8000`
+3. From your laptop:
+   ```bash
+   curl http://<external-ip>:8000/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"model":"Qwen2.5-1.5B-Instruct",
+          "messages":[{"role":"user","content":"Hi"}],
+          "max_tokens":20}'
+   ```
+
+### Stopping
+
+The server runs forever by design (`teardown_cluster = false`). Tear it down
+explicitly when you're done:
+
+```bash
+uv run --project /path/to/baby-shark shark instance list
+uv run --project /path/to/baby-shark shark instance destroy --name <cluster-name>
+```
+
+### Cost notes
+
+| GPU spec | Approx. spot $/hr | Cold start to live endpoint |
+|---|---|---|
+| `L4:1` | $0.20 | ~6 min |
+| `A100:1` | $0.50 | ~7 min |
+| `H100:8` | $20 | ~10 min |
+
+Spot can be preempted. For demos, set `use_spot = false` in `shark.toml`.
+
 ## How parallelism is chosen
 
 `src/parallelism.py` follows ai-factory's heuristic:
