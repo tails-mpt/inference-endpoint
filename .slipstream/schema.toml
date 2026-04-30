@@ -70,6 +70,12 @@ required    = false
 default     = "0.85"
 
 [[input]]
+name        = "HEALTH_TIMEOUT"
+description = "Seconds to wait for /health before declaring the launch failed. Default 2400 (40 min). 70B+ models on a cold VM need 15-25 min for HF download + shard load + FP8 conversion."
+required    = false
+default     = "2400"
+
+[[input]]
 name        = "HF_TOKEN"
 description = "HuggingFace token for gated models. Leave empty for public models."
 required    = false

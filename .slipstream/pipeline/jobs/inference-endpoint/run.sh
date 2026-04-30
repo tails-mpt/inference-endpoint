@@ -57,7 +57,10 @@ SERVER_PID=$!
 
 # 4. Wait for /health. Both engines expose it on the same path.
 echo "Waiting for server to be ready..."
-HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-900}"  # Big models take time to load.
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-2400}"  # 40 min. 70B+ models on a cold VM
+                                          # need ~20 min: HF download (~10 min)
+                                          # + shard/load/FP8 convert (~10 min).
+                                          # Override via HEALTH_TIMEOUT input.
 ELAPSED=0
 INTERVAL=5
 while [ $ELAPSED -lt $HEALTH_TIMEOUT ]; do
