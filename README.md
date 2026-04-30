@@ -4,6 +4,10 @@ Slipstream tool that stands up an OpenAI-compatible inference endpoint for any
 HuggingFace model on **sglang** or **vllm**, on a user-specified GPU shape.
 TP/DP/EP are computed automatically from model size + GPU spec.
 
+> Looking for the **why**? See [docs/architecture.md](docs/architecture.md)
+> for the request flow and [docs/adr/](docs/adr/README.md) for the decisions
+> behind every non-obvious design choice.
+
 ## Inputs
 
 ### Required
