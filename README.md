@@ -113,6 +113,71 @@ uv run --project /path/to/baby-shark shark instance destroy --name <cluster-name
 
 Spot can be preempted. For demos, set `use_spot = false` in `shark.toml`.
 
+### Example configurations
+
+Each entry exercises a different code path. Swap the exports below into the
+launch block above.
+
+#### Single-GPU, public model
+
+Smallest "real" test. No HF token needed.
+
+```bash
+export TARGET_MODEL="Qwen/Qwen2.5-7B-Instruct"
+export ACCELERATORS="A100:1"
+```
+
+Expected: `TP=1, DP=1, EP=1`. ~7 min cold start, ~$0.50/hr.
+
+#### Multi-GPU tensor parallelism (gated model)
+
+Forces `TP > 1`. Validates the parallelism math and HF auth.
+
+```bash
+# https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct — accept the license first
+export HF_TOKEN="hf_..."
+export TARGET_MODEL="meta-llama/Llama-3.1-70B-Instruct"
+export ACCELERATORS="A100:4"
+```
+
+Expected: `TP=4, DP=1, EP=1`. ~12-15 min cold start, ~$5/hr.
+
+#### Mixture-of-experts
+
+Forces `EP > 1`. Validates the MoE branch.
+
+```bash
+export TARGET_MODEL="mistralai/Mixtral-8x7B-Instruct-v0.1"
+export ACCELERATORS="A100-80GB:2"
+```
+
+Expected: `TP=2, DP=1, EP=2`. ~15 min cold start.
+
+#### Speculative decoding (HF draft)
+
+Validates the speculative path on a public draft.
+
+```bash
+export TARGET_MODEL="Qwen/Qwen3-14B-FP8"
+export ACCELERATORS="H100:1"
+export SPEC_ENABLED="true"
+export SPEC_DRAFT_MODEL="RedHatAI/Qwen3-14B-speculator.eagle3"
+export SPEC_METHOD="eagle3"   # or 'EAGLE3' for sglang
+```
+
+### Quota notes
+
+A100/H100 spot quota is per-region in GCP and often zero by default. If
+`sky launch` retries forever:
+
+```bash
+gcloud compute regions describe us-west1 --format="value(quotas)" \
+  | tr ',' '\n' | grep -i nvidia
+```
+
+If the quota you want is zero, request it in the GCP console (Compute Engine
+→ Quotas) or fall back to a smaller GPU spec.
+
 ## How parallelism is chosen
 
 `src/parallelism.py` follows ai-factory's heuristic:
