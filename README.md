@@ -239,4 +239,100 @@ literal-string accelerator value.
 - Quantized checkpoints (`gguf`, `awq`) are detected by file naming only; explicit `QUANTIZATION` is more reliable.
 - KV cache pre-allocation differs between sglang (`mem-fraction-static`) and vllm (`gpu-memory-utilization`); we pass `MEM_FRACTION` to both.
 
+## TODO
+
+Things this v0.1 doesn't do yet. Listed roughly by priority — the security &
+cost items are the riskiest gaps if anyone uses this beyond personal testing.
+
+### Security & access control
+
+- [ ] **API-key auth.** Currently anyone with the external IP can hit the
+      endpoint. sglang accepts `--api-key`; vllm accepts `--api-key`. Add
+      `API_KEY` schema input and thread it into both launchers.
+- [ ] **TLS / HTTPS.** Endpoint is raw HTTP — credentials and prompts go
+      cleartext. Either terminate TLS at a reverse proxy (caddy / nginx) on
+      the same VM, or front with GCP HTTPS Load Balancer.
+- [ ] **Firewall scoping.** SkyPilot's `ports` opens 8000 to `0.0.0.0/0`.
+      Restrict to known CIDRs via `ports` + custom GCP firewall rules.
+- [ ] **HF token leakage.** `HF_TOKEN` is currently passed via `[stage.env]`
+      in plaintext into the SkyPilot YAML. Switch to a secret-manager pull
+      (GCP Secret Manager / GitHub Actions secret) at run.sh time.
+
+### Cost & lifecycle
+
+- [ ] **Auto-shutdown on idle.** Server runs forever unless explicitly
+      destroyed. Add idle-timeout: poll request rate, shut down after N
+      minutes of zero traffic. Optional schema input `IDLE_TIMEOUT_MIN`.
+- [ ] **Budget cap.** No hard ceiling. Add `MAX_RUN_HOURS` that schedules a
+      `gcloud compute instances delete --max-run-duration=Nh` on launch
+      (already used by ai-factory's find_gpu.sh).
+- [ ] **Spot preemption recovery.** Today, preemption = endpoint dies. Move
+      to SkyPilot managed jobs (`sky.jobs.launch()`) for auto-recovery.
+- [ ] **Persistent HF cache.** Every fresh cluster re-downloads weights
+      (~10 min for 70B). Mount a persistent disk at `~/.cache/huggingface`
+      across launches in the same project.
+
+### Token accounting & observability
+
+- [ ] **Per-request token counting.** Both engines emit Prometheus metrics
+      at `/metrics` (sglang: `--enable-metrics` already on; vllm: built-in).
+      Scrape into a dashboard, attribute by API key once auth lands.
+- [ ] **Request log to GCS.** No durable record of who asked what. Stream
+      access logs from sglang/vllm to a GCS bucket via `--log-requests` +
+      a fluentbit sidecar.
+- [ ] **Cost-per-1k-tokens reporting.** Compute from GPU $/hr × utilization
+      × throughput. Useful as an output artifact.
+- [ ] **Latency percentiles in MLflow.** Mirror number-generator's MLflow
+      pattern for benchmark runs.
+
+### Untested code paths
+
+- [ ] **vllm engine.** Argv builder exists but never run end-to-end. Smoke
+      test on `Qwen/Qwen2.5-1.5B-Instruct` / `L4:1`.
+- [ ] **Speculative decoding.** Both engines wired up; not validated.
+      Smoke test: sglang EAGLE3 with `RedHatAI/Qwen3-14B-speculator.eagle3`.
+- [ ] **MoE / EP path.** Math validated locally (Mixtral on H100:4 → EP=2);
+      live launch never attempted.
+- [ ] **Multi-cloud.** Only GCP tested. SkyPilot supports AWS, Azure,
+      Lambda, RunPod — should work via just changing `cloud` in shark.toml,
+      not verified.
+
+### Fit-check & parallelism
+
+- [ ] **Pipeline parallelism (PP).** We compute TP and DP, never PP.
+      Models too large for TP-on-one-node need PP across nodes.
+- [ ] **Auto-pick fp8 vs int8wo by architecture.** Today the user has to
+      know fp8 is Hopper+. Could auto-substitute int8wo on Ampere when fp8
+      is requested, with a warning.
+- [ ] **Activation memory modeling at long context.** Flat 20% overhead is
+      wrong for `MAX_MODEL_LEN=128k`. Account for sequence length × hidden
+      dim × layers in the estimate.
+- [ ] **Honor `num_key_value_heads` (GQA) in TP validation.** Currently we
+      validate against `num_attention_heads`; for GQA models, `num_kv_heads`
+      is the tighter constraint.
+
+### Infrastructure & DX
+
+- [ ] **Tests.** Zero tests in this repo. At minimum: unit tests for
+      `parse_accelerators`, `_next_power_of_two`, `calculate_parallelism`
+      (we have local smoke tests but not committed).
+- [ ] **CI.** No GitHub Actions. Add lint + unit-test workflow.
+- [ ] **De-vendor parallelism math.** `src/parallelism.py` is copied from
+      ai-factory. Either depend on ai-factory as a package (after it adds
+      `pyproject.toml`) or extract a shared `tails-mpt/ai-inference-utils`
+      library. See discussion in commit history.
+- [ ] **More GPUs in `gpu_specs.py`.** Add MI300X, RTX 6000 Ada, etc. as
+      SkyPilot adds them.
+- [ ] **GGUF / AWQ / GPTQ paths.** Currently only fp8 + torchao. Llama.cpp
+      / AWQ could run much smaller models on cheaper GPUs.
+- [ ] **Local-only mode.** No way to run sglang/vllm against a local model
+      directory. Useful for testing draft-model pairs developed in-house.
+
+### Known caveats already documented
+
+- Baby-shark `${VAR}` interpolation: still on PR
+  [tails-mpt/baby-shark#110]; without merge, this tool depends on the
+  feature branch.
+- fp8 quantization requires Hopper+ (guarded in `parallelism.py`).
+
 [tails-mpt/baby-shark#110]: https://github.com/tails-mpt/baby-shark/pull/110
