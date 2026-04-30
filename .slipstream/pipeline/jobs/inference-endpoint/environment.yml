@@ -1,0 +1,13 @@
+# Base env for inference-endpoint. The actual engine (sglang or vllm) is
+# pip-installed into this env at runtime by run.sh, so a single shark.toml
+# can dispatch to either engine without dependency conflicts at env-create time.
+name: inference-endpoint
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.11
+  - pip
+  - uv
+  - pip:
+      - huggingface_hub>=0.36.0

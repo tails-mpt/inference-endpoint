@@ -1,0 +1,6 @@
+name   = "inference-endpoint"
+bucket = "gs://REPLACE_WITH_YOUR_BUCKET"  # substituted by slipstream at runtime
+
+[[stage]]
+name = "serve"
+dir  = "jobs/inference-endpoint"

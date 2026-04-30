@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inference-endpoint"
+version = "0.1.0"
+description = "Slipstream tool: stand up an OpenAI-compatible inference endpoint for any HuggingFace model on sglang or vllm."
+requires-python = ">=3.10"
+dependencies = [
+    "huggingface_hub>=0.36.0",
+]
+
+[tool.setuptools]
+package-dir = {"inference_endpoint" = "src"}
+packages = ["inference_endpoint"]

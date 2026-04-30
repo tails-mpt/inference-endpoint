@@ -1,0 +1,104 @@
+[tool]
+name        = "inference-endpoint"
+version     = "0.1"
+description = "Stand up an OpenAI-compatible inference endpoint for any HuggingFace model on sglang or vllm. TP/DP/EP are auto-computed."
+run_mode    = "pipeline"
+# Path is relative to this file. Slipstream resolves it via schema_dir so the
+# full path becomes: tools/inference-endpoint/.slipstream/pipeline/shark_pipeline.toml
+pipeline    = "pipeline/shark_pipeline.toml"
+
+# ---------------------------------------------------------------------------
+# Required
+# ---------------------------------------------------------------------------
+
+[[input]]
+name        = "TARGET_MODEL"
+description = "HuggingFace model ID, e.g. 'Qwen/Qwen2.5-1.5B-Instruct' or 'meta-llama/Llama-3.1-70B-Instruct'."
+required    = true
+example     = "Qwen/Qwen2.5-1.5B-Instruct"
+
+[[input]]
+name        = "ACCELERATORS"
+description = "SkyPilot GPU spec, e.g. 'L4:1', 'A100:8', 'H100:4'. Cost and availability are user-controlled — we don't auto-pick."
+required    = true
+example     = "A100:8"
+
+# ---------------------------------------------------------------------------
+# Engine + serving knobs
+# ---------------------------------------------------------------------------
+
+[[input]]
+name        = "ENGINE"
+description = "Inference engine: 'sglang' or 'vllm'."
+required    = false
+default     = "sglang"
+
+[[input]]
+name        = "SERVED_MODEL_NAME"
+description = "Alias clients use in OpenAI-compatible requests. Defaults to the basename of TARGET_MODEL."
+required    = false
+default     = ""
+
+[[input]]
+name        = "PORT"
+description = "TCP port the server listens on. Same default for both engines."
+required    = false
+default     = "8000"
+
+[[input]]
+name        = "MAX_MODEL_LEN"
+description = "Max context length. sglang: passed as --context-length; vllm: --max-model-len (use 'auto' to fit KV cache)."
+required    = false
+default     = ""
+
+[[input]]
+name        = "DTYPE"
+description = "Computation dtype: 'auto', 'bfloat16', 'float16', 'float32'. Empty = engine default."
+required    = false
+default     = ""
+
+[[input]]
+name        = "QUANTIZATION"
+description = "Quantization. sglang: 'fp8' or torchao methods (int4wo-128, int8wo, int8dq). vllm: 'fp8', 'bitsandbytes', 'torchao'."
+required    = false
+default     = ""
+
+[[input]]
+name        = "MEM_FRACTION"
+description = "Fraction of GPU memory the server can use. 0.85 leaves room for the OS + drivers."
+required    = false
+default     = "0.85"
+
+[[input]]
+name        = "HF_TOKEN"
+description = "HuggingFace token for gated models. Leave empty for public models."
+required    = false
+default     = ""
+
+# ---------------------------------------------------------------------------
+# Speculative decoding (HF drafts only)
+# ---------------------------------------------------------------------------
+
+[[input]]
+name        = "SPEC_ENABLED"
+description = "Enable speculative decoding ('true' or 'false')."
+required    = false
+default     = "false"
+
+[[input]]
+name        = "SPEC_DRAFT_MODEL"
+description = "HuggingFace model ID of the draft/speculator, e.g. 'RedHatAI/Qwen3-14B-speculator.eagle3'."
+required    = false
+default     = ""
+
+[[input]]
+name        = "SPEC_METHOD"
+description = "Speculative method. sglang accepts EAGLE / EAGLE3 / STANDALONE; vllm accepts eagle / eagle3. Case-insensitive."
+required    = false
+default     = "eagle3"
+
+[[input]]
+name        = "SPEC_NUM_TOKENS"
+description = "Number of speculative tokens drafted per step."
+required    = false
+default     = "3"

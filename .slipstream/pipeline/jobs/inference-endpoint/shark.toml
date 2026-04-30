@@ -1,0 +1,20 @@
+[job]
+project_name     = "inference-endpoint"
+# Server runs forever — explicit teardown via `shark instance destroy <run-id>`.
+teardown_cluster = false
+# Three levels up from .slipstream/pipeline/jobs/inference-endpoint/ → repo root.
+repo_dir         = "../../../.."
+
+[resources]
+cloud         = "gcp"
+# Driven by the ACCELERATORS [[input]] in schema.toml. Requires baby-shark
+# >= the ${VAR} interpolation patch (PR #110); without it, this is a literal
+# string and the launch will fail.
+accelerators  = "${ACCELERATORS}"
+use_spot      = true
+disk_size     = 200          # Big models need room for weights + HF cache.
+ports         = "${PORT:-8000}"
+
+[execution]
+entrypoint = "run.sh"
+conda_env  = "environment.yml"
